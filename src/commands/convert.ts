@@ -2,7 +2,7 @@ import { Command, flags } from '@oclif/command'
 import glob from 'glob'
 import path from 'path'
 import fs from 'fs'
-import moo from 'moo'
+import moo, { Lexer } from 'moo'
 import csvStringify from 'csv-stringify'
 
 export default class Convert extends Command {
@@ -36,33 +36,61 @@ export default class Convert extends Command {
       NL: { match: /(?:\r|\n|\r\n)/, lineBreaks: true },
     })
 
-    const result: any[] = []
-
-    files.forEach(filepath => {
+    for (let idx in files) {
+      const filepath = files[idx]
       const stat = fs.statSync(filepath)
 
       if(!stat.isFile()) {
         return
       }
 
-      lexer.reset(fs.readFileSync(filepath, 'utf8'))
+      console.log(filepath)
 
-      let current = []
-      for (const here of lexer) {
-        if (here.type === 'STRING') {
-          current.push(here.value)
-        } else if (here.type === 'NL') {
-          result.push(current)
-          current = []
-        }
-      }
-      if (current.length > 0) {
-        result.push(current)
-      }
-    })
-
-    const csv = csvStringify(result, { header: false }, (err, out) => {
-      console.log(out)
-    })
+      await processFile(lexer, filepath)
+    }
   }
+}
+
+const processFile = async (lexer: Lexer, filepath: string) => {
+  console.log('Start load...')
+  lexer.reset(fs.readFileSync(filepath, 'utf8'))
+  console.log('loaded.')
+  const result = []
+
+  let current = []
+  for (const here of lexer) {
+    if (here.type === 'STRING') {
+      current.push(here.value)
+    } else if (here.type === 'NL') {
+      result.push(current)
+      current = []
+    }
+  }
+  if (current.length > 0) {
+    result.push(current)
+  }
+
+  console.log('Start write...')
+  const stream = csvStringify(result, { header: false })
+  await new Promise((resolve, reject) => {
+    const chunks: any[] = []
+
+    stream.on('error', (err) => {
+      reject(err)
+    })
+    stream.on('data', (chunk) => {
+      chunks.push(chunk)
+    })
+
+    stream.on('end', () => {
+      const result = Buffer.concat(chunks).toString('utf8')
+      fs.writeFileSync(
+        [filepath, '.csv'].join(''),
+        result
+      )
+      resolve(result)
+    })
+  })
+
+  console.log('wrote.')
 }
