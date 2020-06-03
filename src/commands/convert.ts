@@ -19,7 +19,7 @@ export default class Convert extends Command {
   async run() {
     const { args, flags } = this.parse(Convert)
 
-    const result = glob.sync(
+    const files = glob.sync(
       flags.glob,
       {
         cwd: path.resolve(process.cwd(), flags.cwd)
@@ -27,25 +27,25 @@ export default class Convert extends Command {
     )
     .map(x => path.resolve(flags.cwd, x))
 
-    result.forEach(filepath => {
+    const lexer = moo.compile({
+      WS: / /,
+      STRING: [
+        { match: /[^\s"]+/ },
+        { match: /".*?"/, value: x => x.slice(1, -1) }
+      ],
+      NL: { match: /(?:\r|\n|\r\n)/, lineBreaks: true },
+    })
+
+    const result: any[] = []
+
+    files.forEach(filepath => {
       const stat = fs.statSync(filepath)
 
       if(!stat.isFile()) {
         return
       }
 
-      const lexer = moo.compile({
-        WS: / /,
-        STRING: [
-          { match: /[^\s"]+/ },
-          { match: /".*?"/, value: x => x.slice(1, -1) }
-        ],
-        NL: { match: /(?:\r|\n|\r\n)/, lineBreaks: true },
-      })
-
       lexer.reset(fs.readFileSync(filepath, 'utf8'))
-
-      const result = []
 
       let current = []
       for (const here of lexer) {
@@ -56,10 +56,13 @@ export default class Convert extends Command {
           current = []
         }
       }
+      if (current.length > 0) {
+        result.push(current)
+      }
+    })
 
-      const csv = csvStringify(result, { header: false }, (err, out) => {
-        console.log(out)
-      })
+    const csv = csvStringify(result, { header: false }, (err, out) => {
+      console.log(out)
     })
   }
 }
