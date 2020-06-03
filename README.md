@@ -6,7 +6,8 @@ Convert AWS ELB logs to CSV.
 
 ```sh
 pwd
-# /tmp/AWSLogs/xxxxxxxxxxxx/elasticloadbalancing/ap-northeast-1
+# /tmp/AWSLogs/xxxxxxxxxxxx/elasticloadbalancing/xx-xxxxxxxxx-x
+aws s3 cp s3://xxxxxxxx/AWSLogs/xxxxxxxxxxxx/elasticloadbalancing/xx-xxxxxxxxx-x . --recursive
 elblogs-to-csv extract
 elblogs-to-csv convert > /tmp/concat-logs.csv
 ```
